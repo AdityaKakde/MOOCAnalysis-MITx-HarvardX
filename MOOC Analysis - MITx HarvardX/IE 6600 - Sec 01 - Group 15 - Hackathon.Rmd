@@ -1,0 +1,434 @@
+---
+title: "MOOC Analysis - MITx and HarvardX"
+author: "Aditya Kakde"
+date: "`r Sys.Date()`"
+output:
+  html_document: default
+  pdf_document: default
+---
+<style>
+body {
+text-align: justify}
+</style>
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+```
+```{r Libraries}
+library(tidyr)
+library(dplyr)
+library(reshape)
+library(reshape2)
+library(magrittr)
+library(lubridate)
+library(ggplot2)
+library(ggrepel)
+library(moonBook)
+library(scales)
+library(plotrix)
+library(gridExtra)
+library(treemapify)
+library(cowplot)
+library(webr)
+library(RColorBrewer)
+library(scales)
+library(plotly)
+library(zoo)
+library(ggalluvial)
+library(stringr)
+```
+### Introduction
+Over the years the increasing changes in technology have revolutionized a myriad of daily tasks. Learning or Education is one such task which also faced a revolutionary change with the advent of **Educational Technology**. Educational Technology is the combined use of computer hardware, software, and educational theory and practice to facilitate **e-learning**. One such program is the well-known **OpenCourseWare (OCW)**, launched jointly by MIT and Harvard Universities.
+
+OpenCourseWare (OCW) are course lessons or content curated at universities and published for free on the web. OCW projects first appeared in the late 1990s, and after gaining traction in Europe and then the United States have become a worldwide means of delivering educational content via the Internet. 
+
+A similar initiative was launched in 2012 on an online learning platform EdX. Massachusetts Institute of Technology (MIT) and Harvard University launched open online courses on edX, a non-profit learning platform co-founded by the two institutions. Through the years gone by, new learners are eager to ask some questions about such online tools before they can delve into it themselves. Through this analysis, we intend to highlight some of the key insights and statistics that could answer most of Frequently Asked Questions.
+
+This report walks you through three key sections : 
+
+1. University level analytics
+
+2. Analysis based on enrollments and student engagement
+
+3. Certifications and Audit statistics
+
+### University level analytics
+In this section, we look to answer some key questions through the use of visualizations and statistics. Some of the questions we aim to answer are -
+(1) How many courses are offered by Harvard and MIT respectively on the online platforms. (2) What distribution do these courses follow with respect to gender, domain of study, university, etc. (3) What would be the estimated proportion of engagement by learners on this platform, with the courses and content.
+```{r Data Preprocessing, echo = FALSE}
+#Loading the dataset
+main_df <- read.csv('appendix.csv') 
+
+#Defining a color palette for uniform colouring across report
+colorPalette <- c("#04cbd3","#61d8d8","#b9ebec","#ff8c89","#61d8d8","#ffa097","#ffd0ca")
+#Checking the dimension of the dataset
+#dim(main_df)
+#Checking if there are any NA values in any columns
+#colSums(is.na(main_df))
+# Chekcing the column names of the dataset
+#names(main_df)
+```
+```{r plot1}
+#Filtering HarvardX courses and taking count
+harvard = count(main_df %>% filter(Institution=='HarvardX')) $n[1]
+#Filtering MITx courses and taking count
+mit = count(main_df %>% filter(Institution=='MITx')) $n[1]
+# Making a vector with the two above counts
+total_courses = c(harvard,mit)
+#Finding the percentage per segment
+percentage = round((100*total_courses/sum(total_courses)),2)
+# Creating labels for the Pie chart
+lbls = c('HarvardX','MITx')
+lbls <- paste(lbls, percentage) # add percentage to labels 
+lbls <- paste(lbls,"%",sep="") # add % to labels 
+pie_p1 <- pie3D(total_courses,labels = lbls, main="Fig (1.1) Percentage of Courses by HarvardX and MITx",col=c("#ff8c89","#61d8d8"),explode=0.1,
+      theta = 0.8)
+
+
+```
+
+Fig (1.1) clearly shows the proportion of courses on EdX and OpenCourseWare by Harvard and MIT respectively. 
+We can see that MIT provides a total of 55.52% of the course content on online learning platforms while Harvard constitutes for the remaining 44.48%.
+
+Moving further we know that the courses can be broadly categorized into 4 domains, namely - Computer Science, STEM Courses and Others, which consists of courses like Humanities, History, Design, Social Science, etc. 
+All these domains have course contents put up on online learning platforms. Fig (1.2) shows us the distribution of content based on the various domains.
+
+```{r plot2}
+# Creating a count for each of the departments
+c1 <- count(main_df %>% filter(Course.Subject == 'Computer Science')) $n[1]
+c2 <- count(main_df %>% filter(Course.Subject == 'Government, Health, and Social Science')) $n[1]
+c3 <- count(main_df %>% filter(Course.Subject == 'Humanities, History, Design, Religion, and Education')) $n[1]
+c4 <- count(main_df %>% filter(Course.Subject == 'Science, Technology, Engineering, and Mathematics')) $n[1]
+# Saving all the counts in a vector, adding Humanities and Goverment subjects as one class "others" for ease of analysis
+total_subs <- c(c1,c2+c3,c4)
+# Computing the percentage of each slice of the pie chart
+percentage = round((100*total_subs/sum(total_subs)),2)
+# Setting the labels
+lbls = c('Computer Science','Other','STEM')
+lbls <- paste(lbls, percentage) # add percentage to labels 
+lbls <- paste(lbls,"%",sep="") # add % to labels 
+# Plotting the pie chart
+pie_p2 <- pie3D(total_subs,labels = lbls, main="Fig (1.2) Percentage of Courses by Domain",labelcex = 0.85,col=c("#ffd0ca", "#ffa097","#61d8d8"),explode=0.1,
+      theta = 0.8)
+
+```
+
+Through Fig (1.2) we can see that the STEM courses have more course offerings than Computer Science. This could clearly be due to the fact that Engineering being a broad field, consists of various sub-domains. These various sub-domains along with Technology and Mathematics subjects are clearly a bigger proportion compared to Computer Science alone.
+
+```{r plot 3}
+# Grouping by Institution and Subject to find the total number of enrollments per subject in each university
+df_test <- main_df %>% group_by(Institution,Course.Subject) %>% summarize(Total_count = n()) 
+# Plotting a tree map to visualise the data
+tree_test <- ggplot(df_test, aes(area=Total_count, label=Course.Subject, fill=Course.Subject)) +
+     geom_treemap(aes(width = 0.5, height = 0.5)) +
+     ggtitle("Fig(1.3) Distribution of Courses offered by Harvard and MIT") +labs(fill="Subject") + scale_fill_manual(values=colorPalette)+ theme(plot.title = element_text(face = "bold")) + facet_grid(~Institution)
+tree_test
+```
+
+
+Fig(1.3) Shows the distribution of courses offered by Harvard and MIT University by different domains.We can clearly see that STEM courses are more popular at MIT while Humanities, History, Design, Religion courses are more popular at Harvard.
+
+Every user can engage with a course in two different ways. You can either audit the course for free or access a paid version of the course for certification. All the courses offer these two modes. Fig(1.4) shows us the percentage of users who audited vs the percentage of users who accessed the certified version of the courses. The chart represents the percentage of enrollements by Institution. 
+
+
+```{r plot4}
+# Calculating the total number of audited courses at Harvard
+audit_harvard <- sum((main_df %>% filter(Institution=='HarvardX'))$Audited....50..Course.Content.Accessed)
+# Calculating total number of certificate courses in Harvard
+certificate_harvard <- sum((main_df %>% filter(Institution=='HarvardX'))$Certified)
+# Calculating total number of audited courses at MIT
+audit_mit <- sum((main_df %>% filter(Institution=='MITx'))$Audited....50..Course.Content.Accessed)
+# Calculating total number of certificate courses at MIT
+certicate_mit <- sum((main_df %>% filter(Institution=='MITx'))$Certified)
+# Creatinga a dataframe of the above columns
+course_enrollment <- data.frame(Institution=c('Harvard','Harvard','MIT','MIT'),Type=c('Audit','Certified','Audit','Certified'), Total=c(audit_harvard,certificate_harvard,audit_mit,certicate_mit))
+# Creating a PieDonut chart to visualise the above data
+PieDonut(course_enrollment, aes(Institution, Type, count=Total), title = "Fig(1.4) Type of Enrollments by University",ratioByGroup = FALSE,color = "white",explodePie=FALSE,explodeDonut=TRUE)
+```
+```{r plot6}
+
+```
+```{r DataFrames, include=FALSE}
+df<-read.csv("appendix.csv")
+```
+### Analysis based on enrollments and student engagement
+To better understand the relationship between course participants and various attributes, we will delve into the following questions:
+1.How many participants are there in each type of course (STEM and Non-STEM) and what is their gender distribution for each year from 2012 to 2016?
+2.What is the total number of participants in each subject and what is their gender distribution?
+3.How does the institution vary and what is the percentage of participants with advanced qualifications?
+
+By answering these questions, we will gain a deeper understanding of the demographics of course participants and their academic backgrounds, which will help us to identify trends and patterns in education. 
+ 
+
+```{r Section 2,echo=FALSE}
+
+#reading the csv file 
+course_dataframe=read.csv("appendix.csv")
+
+#Changing the column names 
+course_dataframe <- setNames(course_dataframe, c("Institution", "Course_Number", "Launch_Date", "Course_Name",
+                         "Instructors", "Course_Subject", "Year", "Honor_Code_Certificates", 
+                         "Participants_Accessed", "Participants_Audited_Over50percent", "Participants_Certified",
+                         "Audited_in_percentage", "Certified_in_percentage", "Percent_Certified_Over50pct",
+                         "Played_Video__in_percentage", "Posted_Forum_in_percentage", "Grade_Higher_than_0_in_percentage",
+                         "Total_Hours_Thousands", "Median_for_Hours_Certification", "Median_Age",
+                         "Male_in_percentage", "Female_in_percentage", "Bachelor_orHigher_in_percentage"))
+
+  
+
+#creating a temporary data frame consisting of 3 columns Participants_Accessed, Male_in_percentage, Female_in_percentage                            
+participants_gender_df <- course_dataframe[, c("Participants_Accessed", "Male_in_percentage", "Female_in_percentage")]
+
+#calculating total number of males and females based on the formula -
+# Total Number of Male /female =  ( Number of participants * ( Male / female ) ) / 100
+participants_gender_df<- participants_gender_df %>% summarise(Participants_Accessed,
+                                total_no_of_male = round((Male_in_percentage * Participants_Accessed / 100), 0),
+                                total_no_of_female =round((Female_in_percentage * Participants_Accessed / 100), 0))
+
+participants_gender_df <- participants_gender_df[, -1]
+
+           
+course_dataframe <-cbind(course_dataframe, participants_gender_df)
+
+# Classifying Science Technology Engineering and Mathematics and  Computer Science into STEM and others as Non Stem 
+course_dataframe <- course_dataframe %>%
+mutate(Stem_or_non_stem = if_else(Course_Subject %in% c("Science, Technology, Engineering, and Mathematics", "Computer Science"),"Stem","Non_Stem"))
+
+# Extracting the year from the Launch Date Column  column  
+course_dataframe <- course_dataframe %>%
+mutate(year = as.integer(format(as.Date(Launch_Date, "%m/%d/%Y"), "%Y")))
+
+#Made a data frame consisting of year,Total Number of Female and type of course (STEM / NON STEM )
+female_plot_dataframe <- aggregate(total_no_of_female ~ Stem_or_non_stem + year, 
+                                   data = course_dataframe, 
+                                   FUN = sum, 
+                                   na.rm = TRUE)
+
+
+#Made a data frame consisting of year,Total Number of Male and type of course (STEM / NON STEM )
+male_plot_dataframe <- aggregate(total_no_of_male ~ Stem_or_non_stem + year, 
+                                 data = course_dataframe, 
+                                 FUN = sum, 
+                                 na.rm = TRUE)
+
+
+
+
+# Combine the female and male data into a single dataframe
+combined_plot_dataframe <- rbind(
+  data.frame(
+    Gender = "Female",
+    Total = female_plot_dataframe$total_no_of_female,
+    Stem_or_non_stem = female_plot_dataframe$Stem_or_non_stem,
+    year = female_plot_dataframe$year,
+    Line_Type = "Female"
+  ),
+  data.frame(
+    Gender = "Male",
+    Total = male_plot_dataframe$total_no_of_male,
+    Stem_or_non_stem = male_plot_dataframe$Stem_or_non_stem,
+    year = male_plot_dataframe$year,
+    Line_Type = "Male"
+  )
+)
+
+
+#Plotted the line graph using ggplot 
+combined_plot <- ggplot(combined_plot_dataframe, aes(x = year, y = Total, color = Stem_or_non_stem, linetype = Line_Type)) +
+  geom_line(size = 1) +
+  geom_point() +
+  labs(x = "Launch Year", y = "Total Number of Enrollments") +
+  ggtitle("Fig.(2.1) Combined Course Trends for Males and Females") + theme(plot.title = element_text(face = "bold")) +
+scale_y_continuous(limits = c(0, 740000), labels = function(x) format(x, scientific = FALSE))+
+  theme(plot.title = element_text(hjust = 0.5),
+        legend.position = "top") +
+  scale_linetype_discrete(name = "Gender")+
+  scale_color_discrete(name = "Stem/Non Stem")
+
+combined_plot
+
+
+
+
+
+
+```
+
+From Figure (2.1), it can be noted that the trend of course participation has been on the rise from 2012 to 2015. However, there is a decrease in the number of participants from 2015 to 2016, regardless of the course type and gender of the participants. It is also evident that the peak of enrollment occurred in 2015, with approximately 650,000 male participants enrolled in STEM courses. Furthermore, it can be observed that there is a disparity in gender participation, with more males participating in STEM courses, and a higher number of females enrolled in non-STEM courses.
+
+To improve the above, a more in-depth analysis can be done to determine the reasons behind the decrease in participation from 2015 to 2016
+
+
+
+```{r echo=FALSE}
+#grouped the dataframe on course_subject and created a column which classifies STEM courses and Non Stem Courses 
+grouped_course_dataframe<-course_dataframe %>%
+  group_by(Course_Subject, Stem_or_non_stem) 
+
+#Count the sumation of participants accessed, total number of male and total number of female 
+summarised_dataframe<-grouped_course_dataframe %>%
+  summarise(par = sum(Participants_Accessed), Male = sum(total_no_of_male), Female = sum(total_no_of_female))
+
+#Convert summarised_dataframe from wide format to long format using gather() function
+summarised_dataframe<- summarised_dataframe %>%
+  gather(Gender, Count, Male, Female)
+
+#ploting the graph using plotly library 
+summarised_dataframe%>%
+  plot_ly(x = ~Count, y = ~Course_Subject, color = ~Gender, colors = c(Male = '#04cbd3', Female = '#ff8c89'), type = "bar", orientation = "h") %>%
+  
+   layout(title = "Fig.(2.2) Preferences of subjects  by Gender along with total number of particpants ",
+          xaxis = list(title = "Total Participants in Millions"),
+          yaxis = list(title = "All Subjects"),font = list(family = "Arial, sans-serif", size = 12, color = "black", weight = "bold"),
+      plot_bgcolor = "white",
+                autosize = TRUE,
+
+          barmode = "stack")
+
+
+```
+
+The data presented in Figure (2.2) provides a deeper analysis of the subject areas studied by the participants. It is evident that the largest number of participants have taken Computer Science, followed by Science, Technology, Engineering, and Mathematics (STEM) and then Government, Health, and Social Science. On the other hand, the number of participants who have pursued Humanities, History, Design, Religion, and Education as their subjects is relatively lower. The number of female participants in all three subject areas is roughly the same, around 300,000, except in STEM where it is slightly lower at 267,000. This highlights the need for efforts to encourage more female participation in STEM fields.
+
+```{r echo=FALSE}
+# Dot plot for Bachelors degree or higher as per institution
+
+# Creating the dot plot using ggplot2 library
+dot_plot <- ggplot(course_dataframe, aes(x=Institution, y=Bachelor_orHigher_in_percentage, fill=Stem_or_non_stem)) +
+  # Adding the dot plot using the geom_dotplot function
+  geom_dotplot(binaxis='y', stackdir='center') +
+  # Adding labels to the y-axis and x-axis
+  labs(y="participants with advance qualification in %",x="Institution") +
+  # Adding a title to the plot
+  ggtitle("Fig.(2.3) Dot plot for people more than Bachelors classified by stem or non stem") + theme(plot.title = element_text(face = "bold")) +
+  # Applying a black and white theme to the plot
+  theme_bw() +
+  # Specifying the text size to be 8
+  theme(text = element_text(size = 8))
+
+#Density plot for Bachelors degree or higher
+
+# Creating the density plot using ggplot2 library
+density_plot <- ggplot(course_dataframe, aes(x = Bachelor_orHigher_in_percentage, fill=Stem_or_non_stem)) + 
+  # Adding the density plot using the geom_density function with alpha set to 0.3 for transparency
+  geom_density(alpha = 0.3) +
+  # Adding labels to the x-axis and y-axis
+  labs(x="Percentage of participants with Bachelors degree or higher", y="Density") +
+  # Adding a title to the plot
+  ggtitle("Fig.(2.4) Density Plot for Bachelors Degree or Higher classified by institution and Stem or Non stem") + theme(plot.title = element_text(face = "bold")) +
+  # Applying a black and white theme to the plot
+  theme_bw() +
+  # Specifying the text size to be 8
+  theme(text = element_text(size = 8))
+
+# Displaying both plots in a grid format using grid.arrange function
+grid.arrange(dot_plot, density_plot, nrow=2)
+
+
+
+
+
+```
+
+
+Through Fig (2.3) and Fig (2.4) we can see a distinct change between the number of STEM and non-STEM courses offered at Harvard and MIT. We can see that HarvardX offers more Non-STEM courses while MITx offers more STEM courses.Moreover, we observe that over 50% of enrollments have some sort of higher educational qualification and have enrolled in non-STEM courses at HarvardX, while the remaining have taken STEM courses. We can also see that less than 80% of enrollments with advanced degrees at MIT have enrolled for STEM courses, and the remaining for non-STEM courses.
+
+
+### Certifications and Audit statistics
+This section deals with student level statics. The questions we aim to answer in this section are-[1] What is the certification rate in each subject? [2] What is the average length of a subject and how long a student takes to complete the course on average. [3] How well a student performs if they actively participate in the discussions on forums.
+
+```{r echo=FALSE}
+df <- read.csv('appendix.csv')
+
+#Certification rate by subject
+crate <- df %>% group_by(Institution, Course.Subject, month=as.yearmon(mdy(Launch.Date))) %>%
+  summarize(avg_cert=sum(Certified)/sum(Participants..Course.Content.Accessed.)) 
+
+#Generating the line plot for certification rate
+p1 <- crate%>% 
+  ggplot(aes(month, avg_cert, col=Institution)) + 
+  geom_line() +
+  facet_wrap(~Course.Subject) + 
+  theme(legend.position = "bottom",legend.title=element_blank())  +
+  theme(axis.title.y=element_blank(),axis.title.x=element_blank()) +  theme_bw() +
+  scale_y_continuous(labels=percent)+ ggtitle("Fig(3.1) Certification rate for each field") +theme(plot.title = element_text(face = "bold"))
+p1
+
+
+```
+
+
+Figure 3.1 shows the certification rate per subject offered by the two universities. We can see that computer science courses have a very low certification rate in Harvard as compared to MIT, so we can conclude that Harvard courses are tougher than the ones offered by MIT. 
+
+Government, Health and Social Science courses seem decently popular in both the universities, with a certification rate of almost 15% by students in both universities. Humanity, History, Design, Religion and Education courses however, seem more popular in Harvard than MIT, resulting in a better certification rate also. As for STEM courses, even though Harvard started offering courses almost a year later than MIT, it still manages to have a better certification rate than that of MIT.
+
+One can simply conclude that MIT has a better Computer Science course, but Harvard has taken the edge for all other subject courses.
+
+
+
+```{r echo=FALSE}
+totalHours<-df %>% select(6,18,19) %>% group_by(Course.Subject) %>%
+  summarise(Total_hours_for_certification_per_subject=mean(Total.Course.Hours..Thousands.,na.rm=TRUE))
+medianHours<-df %>% select(6,18,19) %>% group_by(Course.Subject) %>% 
+  summarise(Median_hours_for_certification_per_subject=mean(Median.Hours.for.Certification)) 
+p2 <- plot_ly(totalHours, x = totalHours$Course.Subject, y =totalHours$Total_hours_for_certification_per_subject, type = 'bar', name = 'Total Hours',marker = list(color ="04cbd3" )) %>% 
+  layout(xaxis = list(showticklabels = FALSE),
+         title="Fig.(3.2) Comparison between Total Hours and Median Hours per Subject",
+         xaxis = list(side = "top"))
+
+
+p3 <- plot_ly(medianHours, x = medianHours$Course.Subject, y =medianHours$Median_hours_for_certification_per_subject, type = 'bar', name = 'Median Hours',marker = list(color ="ff8c89")) %>% 
+  layout(xaxis = list(showticklabels = FALSE))
+p3 <- p3 %>%  layout(yaxis = list(range = c(0, 250)))
+
+p <- subplot(p2, p3, nrows = 1) 
+p <- p %>% layout(xaxis = list(title = list(text = "Subjects")), 
+                 yaxis = list(title = "Hours"),
+                 annotations = list(x = 1.2, y = -0.05, 
+                                    text = "* Hover over the bars for more insights", 
+                                    showarrow = F, xref='paper', yref='paper', 
+                                    xanchor='right', yanchor='auto', xshift=0, yshift=0,
+                                    font = list(size = 9, color = "Black")))
+
+p
+```
+
+
+
+Figure 3.2 shows number of hours taken to finish a course versus the time it takes to get certified. Even though the total hours for a computer science course is 280 hours, the time to get the certificate is round 45 hours. But the most time consuming course is STEM, having a total time of 87 hours, taking around 78 hours to get certified. Of all, Humanities, History, Design and Religion is the least tedious course.
+
+
+
+```{r}
+colorPalette <- c("#04cbd3","#61d8d8","#b9ebec","#ff8c89","#61d8d8","#ffa097","#ffd0ca")
+
+p4 <- ggplot(df,aes(Total.Course.Hours..Thousands.,X..Posted.in.Forum,color=X..Certified,shape=Institution)) + 
+             geom_point() + facet_wrap(~Course.Subject) +scale_colour_gradient(high = "#04cbd3", low = "#ff8c89")+xlab("Total Course Hours") + ylab("% posted in forums") +labs(color = "% Certified")+ theme_bw()+ ggtitle("Fig(3.3) Analysing student Interaction per Subject") +theme(plot.title = element_text(face = "bold"))
+p4 
+```
+
+
+Figure 3.3 tries to find a relationship between course hours and number of times a student has posted in forums. The conclusion is that, higher the students interact in the forum, higher the chance they clear their doubts and learn more. Hence there is more certification rate.
+
+As for Humanities, History, Design, Religion and Education, we have already seen that it is the least tedious course. This course also has the highest interaction rate and more certified individuals. We can conclude that, if there is less course hours, there is more certification rate.
+
+### Conclusion
+```{r conclusion}
+# To extract the year from the launch date of each course
+main_df$years<-str_extract_all(main_df$Launch.Date, "\\d{4}", simplify = T)
+# To create groups of students aged below and above 35
+main_df<-transform(main_df,Age=ifelse(main_df$Median.Age<=30 ,"<=35",">35"))
+main_df<-transform(main_df,Course=ifelse(main_df$Course.Subject=="Science, Technology, Engineering, and Mathematics" | main_df$Course.Subject=="Computer Science","Stem","Non_Stem"))
+res <- ggplot(main_df, aes(y=Participants..Course.Content.Accessed., axis2 = years, axis3 = Course, axis1=Institution)) + geom_alluvium(aes(fill = Age), width = 1/12) +
+               geom_stratum(width = 1/12, fill = "black", color = "grey") + # to set x-axis width
+               geom_label(stat = "stratum", aes(label = after_stat(stratum))) +
+               scale_x_discrete(limits = c("Institution", "Year","Discipline Type")) +
+               scale_fill_brewer(type = "qual", palette = "Set1") +scale_y_continuous(labels = function(x) format(x, scientific=FALSE))+
+               ggtitle("Course Preference by Age Groups") + labs(y="Total Participants", x="Discipline Details")+theme_bw()
+res
+```
+
+From these analysis presented, we can see that many courses are offered by both MIT and Harvard. However, STEM courses are popular in MIT whereas Non-STEM courses are popular at Harvard. Some analysis on course preferences by age, gender, and highest qualification of the users are conducted, where students above age 35 prefer Non-STEM courses, at any of the two Universities, whereas students below 35 follow the popular trends. When we talk about the gender affecting the study, we can comment that women preferred Non-STEM courses over STEM courses across all years. Furthur it is observations were made to the percentage of people auditing and accessing the paid certification version and the impact of length of the course and postings in forums made to their certification. Two factors play a major role in people getting certified as posting in forums helps students clear their concepts and so the certification rate is higher. Also, if the number of course hours is less, then more people tend to get certified as compared to courses with longer hours. From the analysis and charts we can see the popularity between Harvard and MIT and how they are positioned in terms of course content and engagement by students towards these courses. This kind of analysis will help universities to analyse which courses need to be focused more on and which domain of study needs launching of new courses. This also helps to promote knowledge and attract great talent from the chronically underrepresented groups, such as women in STEM or the IT industry.  
+
+### Reference- 
+Link to the dataset used in this report:
+[Dataset](https://www.kaggle.com/datasets/edx/course-study)
